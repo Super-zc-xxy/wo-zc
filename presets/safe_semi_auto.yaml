@@ -1,0 +1,39 @@
+id: safe_semi_auto
+name: 稳健半自动（远距/切任务提醒）
+description: 关闭自动大地图传送与自动切任务，仅处理对话、战斗和近距离寻路，降低误操作风险。
+features:
+  auto_dialogue: true
+  auto_combat: true
+  auto_navigate: true
+  auto_teleport: false
+  auto_switch_quest: false
+  auto_absorb_echo: true
+  auto_popup_close: true
+  auto_gadget: true
+combat:
+  exit_grace_sec: 2.5
+  lock_on_key: middle
+  use_concerto_switch: true
+  use_ult_ready: true
+  rotation:
+  - action: click
+    count: 3
+    interval: 0.18
+  - action: key
+    key: e
+  - action: key
+    key: q
+  - action: key
+    key: r
+  - action: switch_next
+navigation:
+  sprint_hold_sec: 0.4
+  turn_sensitivity: 0.38
+  center_deadzone_px: 80
+  far_distance_m: 260
+quest:
+  priority_keywords:
+  - 潮汐任务
+  - 伴星任务
+  - 危行任务
+  - 纪闻任务

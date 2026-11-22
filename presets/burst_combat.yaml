@@ -1,0 +1,40 @@
+id: burst_combat
+name: 高爆发轮切打怪 / 刷声骸
+description: 专注自动锁敌、穿插闪避、协奏满切人与爆发连招，战后自动吸收声骸。
+features:
+  auto_dialogue: true
+  auto_combat: true
+  auto_navigate: true
+  auto_teleport: false
+  auto_switch_quest: false
+  auto_absorb_echo: true
+  auto_popup_close: true
+  auto_gadget: true
+combat:
+  exit_grace_sec: 3.0
+  lock_on_key: middle
+  use_concerto_switch: true
+  use_ult_ready: true
+  rotation:
+  - action: key
+    key: e
+  - action: click
+    count: 4
+    interval: 0.14
+  - action: dodge
+  - action: hold_click
+    duration: 0.55
+  - action: key
+    key: q
+  - action: key
+    key: r
+  - action: switch_next
+navigation:
+  sprint_hold_sec: 0.5
+  turn_sensitivity: 0.45
+  center_deadzone_px: 65
+  far_distance_m: 400
+quest:
+  priority_keywords:
+  - 危行任务
+  - 纪闻任务

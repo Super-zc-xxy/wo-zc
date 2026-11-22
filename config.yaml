@@ -1,0 +1,129 @@
+window:
+  title_keywords:
+  - 鸣潮
+  - Wuthering Waves
+  base_width: 1920
+  base_height: 1080
+hotkeys:
+  toggle: f8
+  stop: f9
+  takeover_done: f7
+active_preset: default_full_quest
+loop:
+  tick_interval: 0.15
+  jitter_min: 0.05
+  jitter_max: 0.13
+  stuck_timeout_sec: 4.0
+  max_unstuck_retries: 3
+  state_timeout_sec: 45.0
+  loading_dark_threshold: 18
+  no_quest_switch_sec: 8.0
+rois:
+  quest_panel:
+  - 10
+  - 133
+  - 462
+  - 523
+  skip_button:
+  - 30
+  - 20
+  - 290
+  - 120
+  confirm_dialog:
+  - 600
+  - 340
+  - 1320
+  - 780
+  dialogue_options:
+  - 1180
+  - 440
+  - 1850
+  - 890
+  interact_prompt:
+  - 1060
+  - 380
+  - 1580
+  - 720
+  minimap:
+  - 40
+  - 20
+  - 265
+  - 245
+  skill_bar:
+  - 1380
+  - 840
+  - 1910
+  - 1070
+  team_portraits:
+  - 1650
+  - 220
+  - 1910
+  - 640
+  combat_center:
+  - 320
+  - 70
+  - 1600
+  - 880
+  gadget_prompt:
+  - 820
+  - 620
+  - 1100
+  - 850
+  map_canvas:
+  - 110
+  - 80
+  - 1810
+  - 1000
+  map_right_panel:
+  - 1300
+  - 740
+  - 1890
+  - 1050
+  quest_menu_list:
+  - 100
+  - 140
+  - 660
+  - 970
+  quest_menu_action:
+  - 1340
+  - 860
+  - 1880
+  - 1050
+  deliver_panel:
+  - 580
+  - 240
+  - 1340
+  - 880
+vision:
+  default_threshold: 0.8
+  ocr_interval_sec: 1.0
+  auto_collect_templates: true
+combat:
+  exit_grace_sec: 2.5
+  lock_on_key: middle
+  use_concerto_switch: true
+  use_ult_ready: true
+  rotation:
+  - action: click
+    count: 3
+    interval: 0.16
+  - action: key
+    key: e
+  - action: click
+    count: 2
+    interval: 0.16
+  - action: key
+    key: q
+  - action: key
+    key: r
+  - action: switch_next
+navigation:
+  sprint_hold_sec: 0.45
+  turn_sensitivity: 0.42
+  center_deadzone_px: 70
+  far_distance_m: 300
+  enable_teleport: true
+logging:
+  level: INFO
+  save_dir: logs
+  save_error_screenshot: true

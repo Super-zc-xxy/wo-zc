@@ -1,0 +1,43 @@
+id: default_full_quest
+name: 全自动清任务（推荐）
+description: 自动过剧情、接取切换任务、大地图传送、3D寻路、轮切打怪并战后吸收声骸。
+features:
+  auto_dialogue: true
+  auto_combat: true
+  auto_navigate: true
+  auto_teleport: true
+  auto_switch_quest: true
+  auto_absorb_echo: true
+  auto_popup_close: true
+  auto_gadget: true
+combat:
+  exit_grace_sec: 2.5
+  lock_on_key: middle
+  use_concerto_switch: true
+  use_ult_ready: true
+  rotation:
+  - action: click
+    count: 3
+    interval: 0.16
+  - action: key
+    key: e
+  - action: click
+    count: 2
+    interval: 0.16
+  - action: key
+    key: q
+  - action: key
+    key: r
+  - action: switch_next
+navigation:
+  sprint_hold_sec: 0.45
+  turn_sensitivity: 0.42
+  center_deadzone_px: 70
+  far_distance_m: 300
+quest:
+  priority_keywords:
+  - 潮汐任务
+  - 伴星任务
+  - 危行任务
+  - 纪闻任务
+  - 每日

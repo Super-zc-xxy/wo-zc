@@ -1,0 +1,27 @@
+id: story_only
+name: 纯自动过剧情 / 对话
+description: 仅自动跳过剧情、确认弹窗、点对话选项与 [F] 交互，不主动跑图或打怪。
+features:
+  auto_dialogue: true
+  auto_combat: false
+  auto_navigate: false
+  auto_teleport: false
+  auto_switch_quest: false
+  auto_absorb_echo: false
+  auto_popup_close: true
+  auto_gadget: false
+combat:
+  exit_grace_sec: 2.0
+  lock_on_key: middle
+  use_concerto_switch: false
+  use_ult_ready: false
+  rotation: []
+navigation:
+  sprint_hold_sec: 0.35
+  turn_sensitivity: 0.4
+  center_deadzone_px: 75
+  far_distance_m: 300
+quest:
+  priority_keywords:
+  - 潮汐任务
+  - 伴星任务
