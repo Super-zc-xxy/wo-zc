@@ -106,8 +106,20 @@ class InputController:
         self._user32 = getattr(ctypes, "windll", None).user32 if hasattr(ctypes, "windll") else None
         self._held_keys = set()
 
+    @staticmethod
+    def _gaussian_duration(base: float, sigma: float = 0.012, min_val: float = 0.035, max_val: float = 0.11) -> float:
+        """拟人化高斯正态分布耗时生成，模拟人类手部按键生理特征。"""
+        val = random.gauss(base, sigma)
+        return max(min_val, min(max_val, val))
+
     def _sleep_jitter(self, base: float = 0.0) -> None:
-        time.sleep(base + random.uniform(self.jitter_min, self.jitter_max))
+        jitter = self._gaussian_duration(
+            (self.jitter_min + self.jitter_max) / 2.0,
+            sigma=0.015,
+            min_val=self.jitter_min * 0.8,
+            max_val=self.jitter_max * 1.25,
+        )
+        time.sleep(base + jitter)
 
     def _send_input(self, inp: INPUT) -> None:
         if self._user32 is None:
@@ -132,7 +144,7 @@ class InputController:
 
     def press_key(self, key: str, hold_sec: float = 0.05) -> None:
         self.key_down(key)
-        time.sleep(hold_sec + random.uniform(0.01, 0.04))
+        time.sleep(self._gaussian_duration(hold_sec, sigma=0.015, min_val=0.035, max_val=0.12))
         self.key_up(key)
         self._sleep_jitter()
 
@@ -154,34 +166,76 @@ class InputController:
         self._send_input(INPUT(INPUT_MOUSE, _INPUT_UNION(mi=mi)))
 
     def smooth_turn(self, total_dx: int, steps: int = 6, step_delay: float = 0.012) -> None:
+        """
+        S 型三次贝塞尔/缓动非线性平滑转角（Ease-in-out Smoothstep: 3t^2 - 2t^3）。
+        伴随微小的垂直轴人体生理震颤（Micro-Jitter），杜绝机械匀速特征。
+        """
         if total_dx == 0:
             return
-        steps = max(1, steps)
-        per_step = total_dx / steps
-        acc = 0.0
-        for _ in range(steps):
-            acc += per_step
-            move_int = int(round(acc))
-            if move_int != 0:
-                self.move_mouse_rel(move_int, 0)
-                acc -= move_int
-            time.sleep(step_delay)
+        steps = max(2, steps)
+        prev_progress = 0.0
+        for i in range(1, steps + 1):
+            t = i / float(steps)
+            # Smoothstep 缓动曲线
+            cur_progress = (3.0 * t * t) - (2.0 * t * t * t)
+            step_dx = int(round(total_dx * (cur_progress - prev_progress)))
+            prev_progress = cur_progress
 
-    def click(self, button: str = "left", hold_sec: float = 0.04) -> None:
-        down_flag, up_flag = {
-            "left": (MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP),
-            "right": (MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP),
-            "middle": (MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP),
+            # 注入极其微小的人体手部垂直微晃动（-1, 0, 1 像素，仅在步长较大时偶尔微晃）
+            micro_dy = random.choice([-1, 0, 1]) if (abs(total_dx) > 30 and random.random() < 0.25) else 0
+
+            if step_dx != 0 or micro_dy != 0:
+                self.move_mouse_rel(step_dx, micro_dy)
+
+            time.sleep(step_delay * random.uniform(0.85, 1.15))
+
+    def mouse_down(self, button: str = "left") -> None:
+        down_flag = {
+            "left": MOUSEEVENTF_LEFTDOWN,
+            "right": MOUSEEVENTF_RIGHTDOWN,
+            "middle": MOUSEEVENTF_MIDDLEDOWN,
         }[button]
         self._send_input(INPUT(INPUT_MOUSE, _INPUT_UNION(mi=MOUSEINPUT(0, 0, 0, down_flag, 0, None))))
-        time.sleep(hold_sec + random.uniform(0.01, 0.03))
+
+    def mouse_up(self, button: str = "left") -> None:
+        up_flag = {
+            "left": MOUSEEVENTF_LEFTUP,
+            "right": MOUSEEVENTF_RIGHTUP,
+            "middle": MOUSEEVENTF_MIDDLEUP,
+        }[button]
         self._send_input(INPUT(INPUT_MOUSE, _INPUT_UNION(mi=MOUSEINPUT(0, 0, 0, up_flag, 0, None))))
+
+    def click(self, button: str = "left", hold_sec: float = 0.04) -> None:
+        self.mouse_down(button)
+        time.sleep(self._gaussian_duration(hold_sec, sigma=0.012, min_val=0.03, max_val=0.09))
+        self.mouse_up(button)
         self._sleep_jitter()
 
     def click_at(self, screen_x: int, screen_y: int, button: str = "left") -> None:
         self.move_cursor(screen_x, screen_y)
         time.sleep(random.uniform(0.03, 0.06))
         self.click(button=button)
+
+    def drag(self, start_x: int, start_y: int, end_x: int, end_y: int, steps: int = 12, duration: float = 0.35) -> None:
+        """
+        拟人化平滑拖拽，使用 Smoothstep 曲线移动并在松开前后添加微小生理停顿。
+        """
+        self.move_cursor(start_x, start_y)
+        time.sleep(random.uniform(0.05, 0.08))
+        self.mouse_down("left")
+        time.sleep(random.uniform(0.04, 0.07))
+        steps = max(3, steps)
+        step_delay = duration / float(steps)
+        for i in range(1, steps + 1):
+            t = i / float(steps)
+            cur = (3.0 * t * t) - (2.0 * t * t * t)
+            cx = int(round(start_x + (end_x - start_x) * cur))
+            cy = int(round(start_y + (end_y - start_y) * cur))
+            self.move_cursor(cx, cy)
+            time.sleep(step_delay * random.uniform(0.9, 1.1))
+        time.sleep(random.uniform(0.04, 0.08))
+        self.mouse_up("left")
+        self._sleep_jitter()
 
     def scroll(self, delta: int) -> None:
         # delta > 0 向上滚，delta < 0 向下滚（标准步长 120）

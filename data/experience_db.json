@@ -1,0 +1,52 @@
+{
+  "memory": {
+    "机关解谜连线": {
+      "action": "switch_quest",
+      "reason": "复杂连线拼图机关，经验库策略：暂跳过切换下一任务",
+      "success_count": 1,
+      "created_at": 1795424773.2730541,
+      "tags": [
+        "puzzle",
+        "line_connect"
+      ]
+    },
+    "吸取爆炸果碎石": {
+      "action": "gadget:levitator",
+      "reason": "控物碎石障碍，经验库策略：切换控物工具吸取投掷",
+      "success_count": 1,
+      "created_at": 1795424773.2730541,
+      "tags": [
+        "levitator",
+        "explosive",
+        "rock"
+      ]
+    },
+    "追踪虚影足迹": {
+      "action": "gadget:sensor",
+      "reason": "虚影足迹线索，经验库策略：切换感知工具扫描追踪",
+      "success_count": 1,
+      "created_at": 1795424773.2730541,
+      "tags": [
+        "sensor",
+        "trail"
+      ]
+    },
+    "追踪前往目标点": {
+      "action": "jump",
+      "reason": "前方检测到矮石阶卡阻，建议向前跳跃翻越",
+      "success_count": 1,
+      "updated_at": 1795424837.862671,
+      "tags": []
+    }
+  },
+  "reflections": [
+    {
+      "context": "陡峭岩壁滑落",
+      "failure_type": "steep_slope",
+      "lesson_learned": "大于65度坡面存在隐形滑坡重力，严禁直冲，应自动转角寻找阶梯或蔓藤攀爬",
+      "timestamp": 1795424773.2730541
+    }
+  ],
+  "version": "2.0_l5",
+  "last_updated": 1795424837.862671
+}

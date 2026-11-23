@@ -84,7 +84,13 @@ class AutoTemplateCollector:
         if crop.size == 0:
             return False
 
-        cv2.imwrite(str(out_path), crop)
+        ok, buf = cv2.imencode(".png", crop)
+        if not ok:
+            return False
+        try:
+            out_path.write_bytes(buf.tobytes())
+        except Exception:
+            return False
         self._last_saved_ts[template_name] = now
         # 刷新 VisionEngine 缓存，使下次直接命中模板
         self.vision._template_cache[template_name] = crop

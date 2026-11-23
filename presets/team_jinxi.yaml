@@ -1,0 +1,41 @@
+id: team_jinxi
+name: 今汐 · 韶光吐息爆发流（今汐+折枝/渊武+维里奈）
+description: 经典今汐韶光龙喷配队。辅助快速上协同延奏，今汐变奏登场积攒满额韶光，释放强化炽龙吐息与终结大招。
+features:
+  auto_dialogue: true
+  auto_combat: true
+  auto_navigate: true
+  auto_teleport: true
+  auto_switch_quest: true
+  auto_absorb_echo: true
+  auto_popup_close: true
+  auto_gadget: true
+combat:
+  exit_grace_sec: 2.8
+  lock_on_key: middle
+  use_concerto_switch: true
+  use_ult_ready: true
+  rotation:
+  - action: key
+    key: e
+  - action: click
+    count: 4
+    interval: 0.12
+  - action: key
+    key: e
+  - action: dodge
+  - action: key
+    key: q
+  - action: key
+    key: r
+  - action: switch_next
+navigation:
+  sprint_hold_sec: 0.45
+  turn_sensitivity: 0.42
+  center_deadzone_px: 65
+  far_distance_m: 350
+quest:
+  priority_keywords:
+  - 潮汐任务
+  - 纪闻任务
+  - 危行任务

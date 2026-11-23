@@ -90,7 +90,12 @@ def save_debug_screenshot(
     out_dir = Path(save_dir) / "screenshots"
     out_dir.mkdir(parents=True, exist_ok=True)
     filename = out_dir / f"{prefix}_{time.strftime('%Y%m%d_%H%M%S')}.png"
-    cv2.imwrite(str(filename), frame)
+    ok, buf = cv2.imencode(".png", frame)
+    if ok:
+        try:
+            filename.write_bytes(buf.tobytes())
+        except Exception:
+            return None
     return str(filename)
 
 

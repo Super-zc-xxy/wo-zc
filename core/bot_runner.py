@@ -2,10 +2,11 @@ import logging
 import threading
 import time
 from pathlib import Path
-from typing import Callable, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import keyboard
 
+from core.ai_agent import AIAgentController
 from core.auto_collector import AutoCalibrator, AutoTemplateCollector
 from core.capture import ScreenCapture
 from core.input_ctrl import InputController
@@ -73,6 +74,8 @@ class BotRunner:
         active_id = str(config.get("active_preset", "default_full_quest"))
         self.active_preset = self.preset_manager.get_preset(active_id)
 
+        self.ai_agent = AIAgentController(config=config, logger=self.logger)
+
         self.sm = QuestStateMachine(
             config=config,
             capture=self.capture,
@@ -82,6 +85,8 @@ class BotRunner:
             preset=self.active_preset,
             on_state_change=self._handle_state_change,
             collector=self.collector,
+            is_running=lambda: self._running,
+            ai_agent=self.ai_agent,
         )
 
         self._lock = threading.Lock()
@@ -103,6 +108,28 @@ class BotRunner:
         self.config.setdefault("vision", {})["auto_collect_templates"] = bool(enabled)
         self.logger.info("运行中自动收集 UI 模板：%s", "已开启" if enabled else "已关闭")
 
+    def set_ai_mode(self, enabled: bool) -> None:
+        if self.ai_agent:
+            self.ai_agent.set_enabled(enabled)
+        self._emit_status()
+
+    def update_ai_config(self, ai_cfg: dict) -> None:
+        if self.ai_agent:
+            self.ai_agent.update_config(ai_cfg)
+        self._emit_status()
+
+    def test_ai_connection(self) -> Tuple[bool, float, str]:
+        if not self.ai_agent:
+            return False, 0.0, "AI 模块未初始化"
+        frame = self.capture.grab(normalize=True)
+        return self.ai_agent.test_connection(frame)
+
+    def fetch_ai_models(self, provider: str, base_url: str, api_key: str) -> List[str]:
+        if self.ai_agent:
+            return self.ai_agent.fetch_models(provider, base_url, api_key)
+        from core.ai_agent import AIAgentController
+        return AIAgentController.fetch_models(provider, base_url, api_key)
+
     def _emit_status(self) -> None:
         if self.on_status_update is None:
             return
@@ -115,6 +142,9 @@ class BotRunner:
             else "未绑定（请先启动鸣潮）"
         )
         tpl_count = len(list((self.base_dir / "assets").glob("*.png")))
+        ai_enabled, ai_reason = (
+            self.ai_agent.get_status_info() if self.ai_agent else (False, "未启用")
+        )
         payload = {
             "running": self._running,
             "state": self.sm.state.value,
@@ -123,6 +153,9 @@ class BotRunner:
             "window_title": win_title,
             "preset_name": self.active_preset.get("name", self.active_preset.get("id", "")),
             "template_count": tpl_count,
+            "ai_enabled": ai_enabled,
+            "ai_reason": ai_reason,
+            "l5_summary": self.sm.get_l5_summary() if hasattr(self.sm, "get_l5_summary") else {},
         }
         try:
             self.on_status_update(payload)
@@ -199,6 +232,8 @@ class BotRunner:
     def stop(self) -> None:
         self._running = False
         self._stop_event.set()
+        if self.ai_agent:
+            self.ai_agent.stop()
         self.inp.release_all()
         self.unregister_hotkeys()
         if self._thread is not None and self._thread.is_alive():
@@ -237,8 +272,11 @@ class BotRunner:
                     time.sleep(0.2)
                     continue
 
-                with self._lock:
-                    self.sm.tick(frame)
+                if not self._running:
+                    time.sleep(0.1)
+                    continue
+
+                self.sm.tick(frame)
                 self._emit_status()
                 time.sleep(self.tick_interval)
             except Exception as exc:

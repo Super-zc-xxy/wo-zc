@@ -7,7 +7,9 @@ features:
   auto_navigate: true
   auto_teleport: true
   auto_switch_quest: true
+  auto_time_adjust: true
   auto_absorb_echo: true
+  auto_heal: true
   auto_popup_close: true
   auto_gadget: true
 combat:

@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from typing import List, Optional, Tuple
 
@@ -50,9 +51,14 @@ class QuestMenuHandler:
                 return ((x1 + x2) // 2, (y1 + y2) // 2)
         return None
 
-    def switch_to_next_quest(self, priority_keywords: Optional[List[str]] = None) -> bool:
+    def switch_to_next_quest(
+        self,
+        priority_keywords: Optional[List[str]] = None,
+        exclude_texts: Optional[List[str]] = None,
+    ) -> bool:
         if self.logger:
-            self.logger.info("当前无追踪任务，尝试按 J 打开任务列表切换下一个未完成任务...")
+            exc_hint = f"（已排除受阻任务: {', '.join(exclude_texts[:2])}）" if exclude_texts else ""
+            self.logger.info("尝试按 J 打开任务列表切换下一个未完成任务%s...", exc_hint)
         self.inp.release_all()
         self.inp.press_key("j")
         time.sleep(0.9)
@@ -71,40 +77,67 @@ class QuestMenuHandler:
             time.sleep(0.4)
             return False
 
-        keywords = priority_keywords or ["潮汐任务", "伴星任务", "危行任务", "纪闻任务", "每日"]
+        category_headers = ("潮汐任务", "伴星任务", "危行任务", "纪闻任务", "每日任务", "日常", "任务列表", "追踪")
 
-        candidates = [ln for ln in lines if len(ln.text) >= 3 and "任务" not in ln.text]
-        target_line = None
-        for kw in keywords:
-            for ln in lines:
-                if kw in ln.text:
-                    target_line = ln
-                    break
-            if target_line is not None:
-                break
-        if target_line is None:
-            target_line = candidates[0] if candidates else lines[0]
-
-        x1, y1, x2, y2 = target_line.bbox
-        sx, sy = self.capture.to_screen_coords((x1 + x2) // 2, (y1 + y2) // 2)
-        self.inp.click_at(sx, sy)
-        time.sleep(0.45)
-
-        frame2 = self.capture.grab(normalize=True)
-        if frame2 is None:
-            self.inp.press_key("esc")
+        def _is_excluded(t: str) -> bool:
+            clean = re.sub(r"[\s：:，,。.！!（）()]", "", t).strip()
+            if not clean or clean in category_headers:
+                return True
+            if exclude_texts:
+                for exc in exclude_texts:
+                    clean_exc = re.sub(r"[\s：:，,。.！!（）()]", "", exc).strip()
+                    if len(clean_exc) >= 2 and (clean_exc in clean or clean in clean_exc):
+                        return True
             return False
 
-        track_btn = self._find_track_button(frame2)
-        if track_btn is not None:
-            tx, ty = self.capture.to_screen_coords(track_btn[0], track_btn[1])
-            self.inp.click_at(tx, ty)
-            time.sleep(0.4)
+        # 过滤候选条目
+        candidates = [ln for ln in lines if len(ln.text.strip()) >= 2 and not _is_excluded(ln.text)]
+        if not candidates:
+            # 宽容兜底：如果全部被排除，至少尝试非分类标题的条目
+            candidates = [ln for ln in lines if len(ln.text.strip()) >= 2 and ln.text.strip() not in category_headers]
+
+        if not candidates:
             if self.logger:
-                self.logger.info(f"已切换并追踪任务：{target_line.text}")
+                self.logger.warning("任务列表中未找到可用的候选任务。")
             self.inp.press_key("esc")
             time.sleep(0.4)
-            return True
+            return False
+
+        # 按优先级排序候选条目
+        keywords = priority_keywords or ["潮汐任务", "伴星任务", "危行任务", "纪闻任务", "每日"]
+
+        def _candidate_rank(ln) -> int:
+            for idx, kw in enumerate(keywords):
+                if kw in ln.text:
+                    return idx
+            return len(keywords)
+
+        candidates.sort(key=_candidate_rank)
+
+        # 逐个候选尝试点击并确认是否能追踪（最多尝试前 4 个候选）
+        for cand in candidates[:4]:
+            x1, y1, x2, y2 = cand.bbox
+            sx, sy = self.capture.to_screen_coords((x1 + x2) // 2, (y1 + y2) // 2)
+            self.inp.click_at(sx, sy)
+            time.sleep(0.45)
+
+            frame2 = self.capture.grab(normalize=True)
+            if frame2 is None:
+                continue
+
+            track_btn = self._find_track_button(frame2)
+            if track_btn is not None:
+                tx, ty = self.capture.to_screen_coords(track_btn[0], track_btn[1])
+                self.inp.click_at(tx, ty)
+                time.sleep(0.4)
+                if self.logger:
+                    self.logger.info(f"已成功切换并追踪新任务：[{cand.text}]")
+                self.inp.press_key("esc")
+                time.sleep(0.4)
+                return True
+            else:
+                if self.logger:
+                    self.logger.info(f"条目 [{cand.text}] 当前不可追踪或已在追踪中，尝试下一个候选...")
 
         self.inp.press_key("esc")
         time.sleep(0.4)

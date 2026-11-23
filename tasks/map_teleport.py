@@ -36,25 +36,45 @@ class MapTeleporter:
         self.logger = logger
         self.collector = collector
 
-    def _find_beacons(self, frame: np.ndarray, roi: List[int]) -> List[Tuple[int, int]]:
-        beacons: List[Tuple[int, int]] = []
-        tpl_hit = self.vision.match_template(frame, "icon_beacon.png", roi=roi, threshold=0.75)
-        if tpl_hit is not None:
-            beacons.append((tpl_hit.cx, tpl_hit.cy))
+    def _find_beacons(self, frame: np.ndarray, roi: List[int]) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
+        """
+        在大地图视口中同时提取普通信标与大型界碑神像（Nexus）。
+        返回 (普通信标列表, 界碑神像列表)。
+        """
+        normal_beacons: List[Tuple[int, int]] = []
+        nexus_beacons: List[Tuple[int, int]] = []
 
+        # 1. 模板匹配普通信标与神像
+        tpl_beacon = self.vision.match_template(frame, "icon_beacon.png", roi=roi, threshold=0.75)
+        if tpl_beacon is not None:
+            normal_beacons.append((tpl_beacon.cx, tpl_beacon.cy))
+
+        tpl_nexus = self.vision.match_template(frame, "icon_nexus.png", roi=roi, threshold=0.75)
+        if tpl_nexus is not None:
+            nexus_beacons.append((tpl_nexus.cx, tpl_nexus.cy))
+
+        # 2. 图像青蓝高亮特征提取
         sub, ox, oy = self.vision.crop_roi(frame, roi)
+        if sub.size == 0:
+            return normal_beacons, nexus_beacons
+
         hsv = cv2.cvtColor(sub, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, np.array([88, 120, 170]), np.array([112, 255, 255]))
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         for cnt in contours:
             area = cv2.contourArea(cnt)
-            if 35 <= area <= 1400:
+            if 35 <= area <= 2200:
                 x, y, w, h = cv2.boundingRect(cnt)
                 ratio = w / max(1, h)
                 if 0.5 <= ratio <= 1.8:
                     cx, cy = ox + x + w // 2, oy + y + h // 2
-                    beacons.append((cx, cy))
-        return beacons
+                    # 面积较大（>= 360）的青蓝图标多为大型界碑/神像
+                    if area >= 360:
+                        nexus_beacons.append((cx, cy))
+                    else:
+                        normal_beacons.append((cx, cy))
+
+        return normal_beacons, nexus_beacons
 
     def _find_teleport_button(self, frame: np.ndarray) -> Optional[Tuple[int, int]]:
         panel_roi = self.rois.get("map_right_panel", [1300, 740, 1890, 1050])
@@ -73,7 +93,7 @@ class MapTeleporter:
 
     def teleport_to_quest(self) -> bool:
         if self.logger:
-            self.logger.info("尝试打开大地图并传送到任务附近信标...")
+            self.logger.info("尝试打开大地图并传送到任务附近信标/神像...")
         self.inp.release_all()
         self.inp.press_key("m")
         time.sleep(1.0)
@@ -85,30 +105,64 @@ class MapTeleporter:
 
         map_roi = self.rois.get("map_canvas", [110, 80, 1810, 1000])
         quest_pos = self.vision.detect_yellow_quest_marker(frame, roi=map_roi)
+
+        # 智能全景视口自适应缩放巡航：当前视口无黄标时向下滚轮缩小地图
+        if quest_pos is None:
+            for zoom_attempt in range(1, 3):
+                if self.logger:
+                    self.logger.info(f"[全景寻标] 当前视口未定位到任务黄标，尝试第 {zoom_attempt} 档缩小地图全景视口...")
+                self.inp.scroll(-160)
+                time.sleep(0.45)
+                frame_zoomed = self.capture.grab(normalize=True)
+                if frame_zoomed is not None:
+                    frame = frame_zoomed
+                    quest_pos = self.vision.detect_yellow_quest_marker(frame, roi=map_roi)
+                    if quest_pos is not None:
+                        if self.logger:
+                            self.logger.info("[全景寻标] 缩放后已成功捕获跨区域任务黄标！")
+                        break
+
         if quest_pos is None:
             if self.logger:
-                self.logger.warning("大地图中未定位到任务黄标，关闭地图。")
+                self.logger.warning("大地图全景缩放后仍未定位到任务黄标，关闭地图。")
             self.inp.press_key("esc")
             time.sleep(0.4)
             return False
 
-        beacons = self._find_beacons(frame, map_roi)
-        if not beacons:
+        normal_beacons, nexus_beacons = self._find_beacons(frame, map_roi)
+        all_candidates = normal_beacons + nexus_beacons
+        if not all_candidates:
             if self.logger:
-                self.logger.warning("大地图中未找到可用信标，关闭地图。")
+                self.logger.warning("大地图中未找到可用信标或神像，关闭地图。")
             self.inp.press_key("esc")
             time.sleep(0.4)
             return False
 
-        nearest = min(
-            beacons,
-            key=lambda p: math.hypot(p[0] - quest_pos[0], p[1] - quest_pos[1]),
-        )
-        if self.collector:
-            nx, ny = nearest
+        # 目标信标智能决策：优先考虑神像界碑（全队回满血+复活）
+        selected_target = None
+        if nexus_beacons and normal_beacons:
+            nearest_nexus = min(nexus_beacons, key=lambda p: math.hypot(p[0] - quest_pos[0], p[1] - quest_pos[1]))
+            nearest_normal = min(normal_beacons, key=lambda p: math.hypot(p[0] - quest_pos[0], p[1] - quest_pos[1]))
+            dist_nexus = math.hypot(nearest_nexus[0] - quest_pos[0], nearest_nexus[1] - quest_pos[1])
+            dist_normal = math.hypot(nearest_normal[0] - quest_pos[0], nearest_normal[1] - quest_pos[1])
+
+            # 若神像到任务的距离并不比普通信标远太多（<= 180px），优先选神像
+            if dist_nexus <= dist_normal + 180:
+                selected_target = nearest_nexus
+                if self.logger:
+                    self.logger.info("[神像优先] 任务附近检测到大型界碑/枢纽神像，优先传送以免费复活并回满全队生命值！")
+            else:
+                selected_target = nearest_normal
+        elif nexus_beacons:
+            selected_target = min(nexus_beacons, key=lambda p: math.hypot(p[0] - quest_pos[0], p[1] - quest_pos[1]))
+        else:
+            selected_target = min(normal_beacons, key=lambda p: math.hypot(p[0] - quest_pos[0], p[1] - quest_pos[1]))
+
+        if self.collector and selected_target is not None:
+            nx, ny = selected_target
             self.collector.collect_bbox(frame, "icon_beacon.png", (nx - 16, ny - 16, nx + 16, ny + 16), pad=2)
 
-        sx, sy = self.capture.to_screen_coords(nearest[0], nearest[1])
+        sx, sy = self.capture.to_screen_coords(selected_target[0], selected_target[1])
         self.inp.click_at(sx, sy)
         time.sleep(0.6)
 
@@ -128,6 +182,6 @@ class MapTeleporter:
         bx, by = self.capture.to_screen_coords(tp_btn[0], tp_btn[1])
         self.inp.click_at(bx, by)
         if self.logger:
-            self.logger.info("已触发快速旅行，等待加载完成...")
+            self.logger.info("已触发快速旅行传送，等待区域加载完成...")
         time.sleep(1.2)
         return True

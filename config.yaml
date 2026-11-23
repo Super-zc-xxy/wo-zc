@@ -127,3 +127,13 @@ logging:
   level: INFO
   save_dir: logs
   save_error_screenshot: true
+ai_autopilot:
+  enabled: false
+  provider: gemini
+  model: gemini-auto
+  api_key: sk-3d979b3d8d12a7988a758f5d99f617f5c9896142203afbca
+  base_url: http://127.0.0.1:8090
+  fast_width: 640
+  fast_height: 360
+  jpeg_quality: 65
+  timeout_sec: 10.0
